@@ -1,18 +1,18 @@
 import userModal from "../models/User.js";
-import bcrypt from  "bcrypt";
+import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import postModal from "../models/Post.js";
 // register new user...
-const userRegistration = async (req, res)=>{
-    const {name, email, password, cpassword, tc} = req.body;
-    const user = await userModal.findOne({email: email});
+const userRegistration = async (req, res) => {
+    const { name, email, password, cpassword, tc } = req.body;
+    const user = await userModal.findOne({ email: email });
     if (user) {
-        res.send({"status": "failed", "message": "Email already exists"});
-    }else{
+        res.send({ "status": "failed", "message": "Email already exists" });
+    } else {
         // validate all field contain data or not
         if (name && email && password && cpassword && tc) {
             if (password === cpassword) {
-               try {
+                try {
                     const salt = await bcrypt.genSalt(10);
                     const hashPassword = await bcrypt.hash(password, salt);
                     const createUser = new userModal({
@@ -22,19 +22,19 @@ const userRegistration = async (req, res)=>{
                         tc: tc
                     })
 
-                        const newUser = await createUser.save();
-                        // Now generate JWT 
-                        const token = jwt.sign({userID: newUser._id}, process.env.JWT_SECRET_KEY, {expiresIn: '5d'});
-                        res.status(201).json({user:newUser, token});
+                    const newUser = await createUser.save();
+                    // Now generate JWT 
+                    const token = jwt.sign({ userID: newUser._id }, process.env.JWT_SECRET_KEY, { expiresIn: '5d' });
+                    res.status(201).json({ user: newUser, token });
 
-               } catch (error) {
-                    res.send({"status": "failed", "message": "unable to register"});
-               }
-            }else{
-                res.send({"status": "failed", "message": "password and confirm password not matched"});
+                } catch (error) {
+                    res.send({ "status": "failed", "message": "unable to register" });
+                }
+            } else {
+                res.send({ "status": "failed", "message": "password and confirm password not matched" });
             }
-        }else{
-            res.send({"status": "failed", "message": "All Fields are required"});
+        } else {
+            res.send({ "status": "failed", "message": "All Fields are required" });
         }
     }
 }
@@ -44,24 +44,24 @@ const userLogin = async (req, res) => {
     try {
         const { email, password } = req.body;
         if (email && password) {
-            const user = await userModal.findOne({email: email});
+            const user = await userModal.findOne({ email: email });
             if (user) {
                 const isMatch = await bcrypt.compare(password, user.password);
                 if (isMatch) {
-                     // Now generate JWT 
-                     const token = jwt.sign({userID: user._id}, process.env.JWT_SECRET_KEY, {expiresIn: '5d'});
-                    res.status(200).json({user, token});
-                }else{
-                    res.send({"status": "failed", "message": "invalid email or password"});
+                    // Now generate JWT 
+                    const token = jwt.sign({ userID: user._id }, process.env.JWT_SECRET_KEY, { expiresIn: '5d' });
+                    res.status(200).json({ user, token });
+                } else {
+                    res.send({ "status": "failed", "message": "invalid email or password" });
                 }
-            }else{
-                res.send({"status": "failed", "message": "You are not registered"});
+            } else {
+                res.send({ "status": "failed", "message": "You are not registered" });
             }
-        }else{
-            res.send({"status": "failed", "message": "All Fields are required"});
+        } else {
+            res.send({ "status": "failed", "message": "All Fields are required" });
         }
     } catch (error) {
-        res.send({"status": "failed", "message": "Unable to login"});
+        res.send({ "status": "failed", "message": "Unable to login" });
 
     }
 }
@@ -72,14 +72,14 @@ const changeUserPassword = async (req, res) => {
         if (password === cpassword) {
             const salt = await bcrypt.genSalt(10);
             const newHashPassword = await bcrypt.hash(password, salt);
-            await userModal.findByIdAndUpdate(req.user._id, {$set: {password: newHashPassword}})
-            res.send({"status": "200", "message": "change password successfully"});
+            await userModal.findByIdAndUpdate(req.user._id, { $set: { password: newHashPassword } })
+            res.send({ "status": "200", "message": "change password successfully" });
 
-        }else{
-            res.send({"status": "failed", "message": "password and confirm password not matched"});
+        } else {
+            res.send({ "status": "failed", "message": "password and confirm password not matched" });
         }
-    }else{
-        res.send({"status": "failed", "message": "All Fields are required"});
+    } else {
+        res.send({ "status": "failed", "message": "All Fields are required" });
     }
 }
 
@@ -111,7 +111,7 @@ const userPasswordReset = async (req, res) => {
     const user = await userModal.findById(id);
     const new_secret = user._id + process.env.JWT_SECRET_KEY;
     try {
-        console.log(token,"xxxxx",  new_secret);
+        console.log(token, "xxxxx", new_secret);
         jwt.verify(token, new_secret);
         if (password && cpassword) {
             if (password === cpassword) {
@@ -211,18 +211,33 @@ const likePost = async (req, res) => {
     }
 };
 
-// Add a comment to a post
 const addComment = async (req, res) => {
-    const { text } = req.body;
-    const postId = req.params.id;
     try {
-        const post = await postModal.findById(postId); // Use the postModal
-        if (!post) return res.status(404).json({ message: "Post not found" });
 
-        post.comments.push({ text, author: req.user._id });
+        if (!req.user) {
+            return res.status(401).json({ message: "Unauthorized user" });
+        }
+        const { text } = req.body;
+        const postId = req.params.id;
+
+        const post = await postModal.findById(postId);
+
+        if (!post) {
+            return res.status(404).json({ message: "Post not found" });
+        }
+
+        const newComment = {
+            text: text,
+            author: req.user._id
+        };
+
+        post.comments.push(newComment);
+
         await post.save();
-        res.json(post);
+
+        res.status(201).json(post);
     } catch (error) {
+
         res.status(500).json({ message: error.message });
     }
 };
@@ -239,5 +254,5 @@ export {
     userLogin,
     changeUserPassword,
     sendEmailResetPassword,
-    userPasswordReset 
+    userPasswordReset
 };
