@@ -1,7 +1,7 @@
 import userModal from "../models/User.js";
 import bcrypt from  "bcrypt";
 import jwt from "jsonwebtoken";
-
+import postModal from "../models/Post.js";
 // register new user...
 const userRegistration = async (req, res)=>{
     const {name, email, password, cpassword, tc} = req.body;
@@ -128,8 +128,113 @@ const userPasswordReset = async (req, res) => {
     }
 }
 
+const createPost = async (req, res) => {
+    try {
+        const { content } = req.body;
+        const newPost = new postModal({
+            content: content,
+            author: req.user._id
+        });
+        const savedPost = await newPost.save();
+        res.status(201).json(savedPost);
+    } catch (error) {
+        res.status(500).json({ message: "Unable to create post", error: error.message });
+    }
+}
+
+// Get all posts
+const getAllPosts = async (req, res) => {
+    try {
+        const posts = await postModal.find().populate('author', 'name email');
+        res.status(200).json(posts);
+    } catch (error) {
+        res.status(500).json({ message: "Unable to retrieve posts", error: error.message });
+    }
+}
+
+// Get post by ID
+const getPostById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const post = await postModal.findById(id).populate('author', 'name email');
+        if (!post) {
+            return res.status(404).json({ message: "Post not found" });
+        }
+        res.status(200).json(post);
+    } catch (error) {
+        res.status(500).json({ message: "Unable to retrieve post", error: error.message });
+    }
+}
+
+// Update a post
+const updatePost = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { content } = req.body;
+        const updatedPost = await postModal.findByIdAndUpdate(id, { content: content }, { new: true });
+        if (!updatedPost) {
+            return res.status(404).json({ message: "Post not found" });
+        }
+        res.status(200).json(updatedPost);
+    } catch (error) {
+        res.status(500).json({ message: "Unable to update post", error: error.message });
+    }
+}
+
+// Delete a post
+const deletePost = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const deletedPost = await postModal.findByIdAndDelete(id);
+        if (!deletedPost) {
+            return res.status(404).json({ message: "Post not found" });
+        }
+        res.status(200).json({ message: "Post deleted successfully" });
+    } catch (error) {
+        res.status(500).json({ message: "Unable to delete post", error: error.message });
+    }
+}
+
+
+// Like a post
+const likePost = async (req, res) => {
+    const postId = req.params.id;
+    try {
+        const post = await postModal.findById(postId); // Use the postModal
+        if (!post) return res.status(404).json({ message: "Post not found" });
+
+        post.likes += 1;
+        await post.save();
+        res.json(post);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// Add a comment to a post
+const addComment = async (req, res) => {
+    const { text } = req.body;
+    const postId = req.params.id;
+    try {
+        const post = await postModal.findById(postId); // Use the postModal
+        if (!post) return res.status(404).json({ message: "Post not found" });
+
+        post.comments.push({ text, author: req.user._id });
+        await post.save();
+        res.json(post);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
 
 export {
+    createPost,
+    getAllPosts,
+    getPostById,
+    updatePost,
+    deletePost,
+    likePost,
+    addComment,
     userRegistration,
     userLogin,
     changeUserPassword,
