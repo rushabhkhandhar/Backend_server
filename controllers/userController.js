@@ -1,54 +1,60 @@
-import userModal from "../models/User.js";
+import userModel from "../models/User.js";
+import postModal from "../models/Post.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import postModal from "../models/Post.js";
-// register new user...
+import crypto from "crypto";
+
 const userRegistration = async (req, res) => {
-    const { name, email, password, cpassword, tc } = req.body;
-    const user = await userModal.findOne({ email: email });
-    if (user) {
-        res.send({ "status": "failed", "message": "Email already exists" });
-    } else {
-        // validate all field contain data or not
-        if (name && email && password && cpassword && tc) {
-            if (password === cpassword) {
-                try {
+    try {
+        const { name, email, password, cpassword, tc } = req.body;
+        const user = await userModel.findOne({ email: email });
+        if (user) {
+            res.send({ "status": "failed", "message": "Email already exists" });
+        } else {
+            if (name && email && password && cpassword && tc) {
+                if (password === cpassword) {
                     const salt = await bcrypt.genSalt(10);
                     const hashPassword = await bcrypt.hash(password, salt);
-                    const createUser = new userModal({
+                    const encryptionKey = crypto.randomBytes(32); 
+                    const iv = crypto.randomBytes(16); 
+                    const cipher = crypto.createCipheriv('aes-256-cbc', encryptionKey, iv);
+                    let encryptedPassword = cipher.update(hashPassword, 'utf8', 'hex');
+                    encryptedPassword += cipher.final('hex');
+                    const createUser = new userModel({
                         name: name,
                         email: email,
-                        password: hashPassword,
+                        passwordEncrypted: encryptedPassword,
+                        encryptionAlgorithm: 'aes-256-cbc',
+                        encryptionKey: encryptionKey.toString('hex'),
+                        encryptionIV: iv.toString('hex'),
                         tc: tc
-                    })
-
+                    });
                     const newUser = await createUser.save();
-                    // Now generate JWT 
-                    const token = jwt.sign({ userID: newUser._id }, process.env.JWT_SECRET_KEY, { expiresIn: '5d' });
-                    res.status(201).json({ user: newUser, token });
-
-                } catch (error) {
-                    res.send({ "status": "failed", "message": "unable to register" });
+                    res.status(201).json({ user: newUser });
+                } else {
+                    res.send({ "status": "failed", "message": "password and confirm password not matched" });
                 }
             } else {
-                res.send({ "status": "failed", "message": "password and confirm password not matched" });
+                res.send({ "status": "failed", "message": "All Fields are required" });
             }
-        } else {
-            res.send({ "status": "failed", "message": "All Fields are required" });
         }
+    } catch (error) {
+        console.error("Error registering user:", error);
+        res.send({ "status": "failed", "message": "Unable to register" });
     }
-}
+};
 
-//  user login..
 const userLogin = async (req, res) => {
     try {
         const { email, password } = req.body;
         if (email && password) {
-            const user = await userModal.findOne({ email: email });
+            const user = await userModel.findOne({ email: email });
             if (user) {
-                const isMatch = await bcrypt.compare(password, user.password);
+                const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(user.encryptionKey, 'hex'), Buffer.from(user.encryptionIV, 'hex'));
+                let decryptedPassword = decipher.update(user.passwordEncrypted, 'hex', 'utf8');
+                decryptedPassword += decipher.final('utf8');
+                const isMatch = await bcrypt.compare(password, decryptedPassword);
                 if (isMatch) {
-                    // Now generate JWT 
                     const token = jwt.sign({ userID: user._id }, process.env.JWT_SECRET_KEY, { expiresIn: '5d' });
                     res.status(200).json({ user, token });
                 } else {
@@ -61,18 +67,18 @@ const userLogin = async (req, res) => {
             res.send({ "status": "failed", "message": "All Fields are required" });
         }
     } catch (error) {
+        console.error("Error logging in user:", error);
         res.send({ "status": "failed", "message": "Unable to login" });
-
     }
-}
-// change user password after login through settings etc..
+};
+// change user password 
 const changeUserPassword = async (req, res) => {
     const { password, cpassword } = req.body;
     if (password && cpassword) {
         if (password === cpassword) {
             const salt = await bcrypt.genSalt(10);
             const newHashPassword = await bcrypt.hash(password, salt);
-            await userModal.findByIdAndUpdate(req.user._id, { $set: { password: newHashPassword } })
+            await userModel.findByIdAndUpdate(req.user._id, { $set: { password: newHashPassword } })
             res.send({ "status": "200", "message": "change password successfully" });
 
         } else {
@@ -89,7 +95,7 @@ const changeUserPassword = async (req, res) => {
 const sendEmailResetPassword = async (req, res) => {
     const { email } = req.body;
     if (email) {
-        const user = await userModal.findOne({ email: email });
+        const user = await userModel.findOne({ email: email });
         if (user) {
             const secret = user._id + process.env.JWT_SECRET_KEY;
             const token = jwt.sign({ userID: user._id }, secret, { expiresIn: '1d' });
@@ -108,7 +114,7 @@ const sendEmailResetPassword = async (req, res) => {
 const userPasswordReset = async (req, res) => {
     const { password, cpassword } = req.body;
     const { id, token } = req.params;
-    const user = await userModal.findById(id);
+    const user = await userModel.findById(id);
     const new_secret = user._id + process.env.JWT_SECRET_KEY;
     try {
         console.log(token, "xxxxx", new_secret);
@@ -117,7 +123,7 @@ const userPasswordReset = async (req, res) => {
             if (password === cpassword) {
                 const salt = await bcrypt.genSalt(10);
                 const newHashPassword = await bcrypt.hash(password, salt);
-                await userModal.findByIdAndUpdate(id, { $set: { password: newHashPassword } });
+                await userModel.findByIdAndUpdate(id, { $set: { password: newHashPassword } });
                 res.send({ "status": "200", "message": "Password reset successfully" });
             } else {
                 res.send({ "status": "failed", "message": "Passwords do not match" });

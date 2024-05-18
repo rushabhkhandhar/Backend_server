@@ -27,15 +27,15 @@ router.post('/send-reset-password', sendEmailResetPassword)
 router.post('/reset/password/:id/:token', userPasswordReset)
 
 router.post('/posts', checkUserAuth, createPost); // Create a new post
-router.get('/posts', getAllPosts); // Get all posts
-router.get('/posts/:id', getPostById); // Get post by ID
+router.get('/posts',checkUserAuth, getAllPosts); // Get all posts
+router.get('/posts/:id', checkUserAuth,getPostById); // Get post by ID
 router.put('/posts/:id', checkUserAuth, updatePost); // Update a post
 router.delete('/posts/:id', checkUserAuth, deletePost); // Delete a post
-router.put('/posts/:id/like', checkUserAuth, likePost);
-router.post('/posts/:id/comment', checkUserAuth, addComment);
+router.put('/posts/:id/like', checkUserAuth, likePost);//Like a post
+router.post('/posts/:id/comment', checkUserAuth, addComment); //Add a comment to a post
 
 // Protected Routes
-router.post('/changepassword', changeUserPassword);
+router.post('/changepassword', checkUserAuth,changeUserPassword);
 
 
 export default router;
