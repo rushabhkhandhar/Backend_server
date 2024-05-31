@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./Frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+  backend:
+    build:
+      context: ./Backend
+    ports:
+      - "5000:5000"
+    environment:
+      - MONGODB_URI=
+       -JWT_SECRET_KEY=
+        -REDIS_URI=
+         -COINGECKO_API_KEY=
+         -EMAIL_USER=
+          -EMAIL_PASS=
+
+      
+    depends_on:
+      - mongo
+
+  mongo:
+    image: mongo:4.2
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+volumes:
+  mongo-data:
