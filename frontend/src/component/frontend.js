@@ -14,7 +14,7 @@ const App = () => {
 
   const fetchAlerts = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/get-alerts');
+      const response = await axios.get('https://backend-server-stock-api.onrender.com/api/get-alerts');
       setAlerts(response.data.alerts);
     } catch (error) {
       console.error('Error fetching alerts:', error);
@@ -29,7 +29,7 @@ const App = () => {
     }
 
     try {
-      await axios.post('http://localhost:5000/api/alert/alert', { email, cryptoSymbol, targetPrice });
+      await axios.post('https://backend-server-stock-api.onrender.com/api/alert/alert', { email, cryptoSymbol, targetPrice });
       fetchAlerts();
       // Reset form fields
       setEmail('');
