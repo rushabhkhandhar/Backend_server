@@ -1,4 +1,4 @@
-
+import './App.css';
 import Frontend from './component/frontend';
 
 function App() {
