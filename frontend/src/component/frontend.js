@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import '/home/rushabh/Desktop/Backend_server/frontend/src/App.css'; 
+import './App.css';
 
 const App = () => {
   const [email, setEmail] = useState('');
